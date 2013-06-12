@@ -6,12 +6,13 @@ class TorusKnot:
 
     def __init__(self, crossings):
         self.n = crossings
-        self.crossings = [(1, 2, self.n)] + \
-                         [(i, i+1, i-1) for i in range(2, self.n)] + \
-                         [(self.n, 1, self.n-1)]
+        self.crossings = [(0, 1, self.n-1)] + \
+                         [(i, i+1, i-1) for i in range(1, self.n-1)] + \
+                         [(self.n-1, 0, self.n-2)]
+
         self.e1 = 1
-        self.l = var('l')
-        self.u = var('u')
+        self.lmb = var('l')
+        self.mu = var('u')
         self.aij = matrix(SR, self.n, self.n, var(self.aij()))
 
     def aij(self):
@@ -23,7 +24,7 @@ class TorusKnot:
 
     def x(self, p, q):
         m = [[0]*self.n for __ in range(self.n)]
-        m[p-1][q-1] = 1
+        m[p][q] = 1
         return matrix(m, Sparse=True)
 
     def l(self, a):
@@ -34,26 +35,52 @@ class TorusKnot:
 
     def o(self, a):
         return self.crossings[a][0]
-        
+
     def psi_l1(self):
-        m = self.l**(-self.e1)*self.x(1, self.r(1))
+        m = self.lmb**(-self.e1)*self.x(0, self.r(0))
 
         for i in range(1, self.n):
-            m = m + self.x(i+1, self.r(i))
+            m = m + self.x(i, self.r(i))
 
         return m
 
     def psi_l2(self):
-        m = matrix(SR, 3, 3)
+        m = matrix(SR, self.n, self.n)
 
         for i in range(self.n):
-            m = m + u*self.x(i, self.l(i)) - \ 
-            self.aij[self.l(i-1)][self.o(i-1)]*self.x(i, self.o(i))
-            
+            m = m + self.mu*self.x(i, self.l(i)) - \ 
+            self.aij[self.l(i)][self.o(i)]*self.x(i, self.o(i))
+
         return m
 
-t = TorusKnot(3)
+    def psi_l(self):
+        return self.psi_l1() + self.psi_l2()
+
+    def psi_r1(self):
+        m = self.lmb**(self.e1)*self.mu*self.x(self.r(0), 0)
+
+        for i in range(1, self.n):
+            m = m + self.mu*self.x(self.r(i), i)
+
+        return m
+
+    def psi_r2(self):
+        m = matrix(SR, self.n, self.n)
+         
+        for i in range(self.n):
+            m = m + self.x(self.l(i), i) - \
+            self.aij[self.o(i)][self.l(i)]*self.x(self.o(i), i)
+
+        return m
+
+    def psi_r(self):
+        return self.psi_r1() + self.psi_r2()
+
+t = TorusKnot(5)
+
 print
-print(t.psi_l2())
+print t.psi_l()
 print
-print(t.aij())
+print t.psi_r()
+print
+print t.aij()
