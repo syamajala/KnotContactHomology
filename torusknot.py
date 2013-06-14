@@ -76,6 +76,15 @@ class TorusKnot:
     def psi_r(self):
         return self.psi_r1() + self.psi_r2()
 
+t = TorusKnot(3)
+
+print
+print t.psi_l()
+print
+print t.psi_r()
+print
+print t.aij()
+
 t = TorusKnot(5)
 
 print
@@ -84,3 +93,4 @@ print
 print t.psi_r()
 print
 print t.aij()
+
