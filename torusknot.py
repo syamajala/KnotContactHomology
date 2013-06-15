@@ -23,9 +23,9 @@ class TorusKnot:
         return a[:len(a)-1]
 
     def x(self, p, q):
-        m = [[0]*self.n for __ in range(self.n)]
-        m[p][q] = 1
-        return matrix(m, Sparse=True)
+        m = matrix(self.n, self.n, Sparse=True)
+        m[p,q] = 1
+        return m
 
     def l(self, a):
         return self.crossings[a][1]
