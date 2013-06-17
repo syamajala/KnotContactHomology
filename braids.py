@@ -110,40 +110,27 @@ class Braid:
         for k in self.w[1:]:
             a.append([])
             for i in a[idx]:
-                print i
+                a[-1].append(self.phi_b_help(k, i, []))
+            idx = idx + 1
+        
+        return a
 
-    def phi_b_help(self, w, l, r, n):
-
-        print
-
-        print "n = ",
-        print n
-        print "l = ",
-        print l
-
-        print "r = ",
-        print r
+    def phi_b_help(self, w, l, r):
 
         if l == [(-1, -1)]:
             return l
         elif l == []:
-            print "n = " + str(n) + " returning ",
-            print r
             return r
         else:
             if type(l[0]) == list:
-                a = self.phi_b_help(w, l[0], [], n+1)
-                print "list n = " + str(n) + " a = ",
-                print a
+                a = self.phi_b_help(w, l[0], [])
             else:
                 a = self.phi_ext(w, *l[0])
-                print "el n = " + str(n) + " a = ",
-                print a
             if len(a) == 1:
                 r.extend(a)
             else:
                 r.append(a)
-            self.phi_b_help(w, l[1:], r, n+1)
+            return self.phi_b_help(w, l[1:], r)
 
     def phi_ls(self, i):
         s = i-1
