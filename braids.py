@@ -45,7 +45,11 @@ class Braid:
 
         return a[:len(a)-1]
 
-    def phi_s(self, z, x, y):
+    def phi_sk(self, z, x, y):
+        """
+        phi_sk returns phi_sigma_z(a_xy) 
+        """
+
         k = z - 1
         i = x - 1
         j = y - 1
@@ -72,7 +76,11 @@ class Braid:
         elif i != k and i != k+1 and j != k and j != k+1:
             return [(i, j)]
 
-    def phi_ext(self, z, x, y):
+    def phi_ext_sk(self, z, x, y):
+        """
+        phi_ext_sk returns phi^ext_sigma_z(a_xy) 
+        """
+
         k = z
         i = x
         j = y 
@@ -99,12 +107,13 @@ class Braid:
         elif i != k and i != k+1 and j != k and j != k+1:
             return [(i, j)]
 
-    def phi_b(self):
+    def phi_b_ext(self, i, j):
+        """
+        phi_b_ext returns phi_b_ext(a_ij)
+        """
         a = [[]]
 
-        for i in range(0, self.s+1):
-            for j in range(0, self.s+1):
-                a[0].append(self.phi_ext(self.w[0], i, j))
+        a[0].append(self.phi_ext_sk(self.w[0], i, j))
 
         idx = 0
         for k in self.w[1:]:
@@ -112,8 +121,8 @@ class Braid:
             for i in a[idx]:
                 a[-1].append(self.phi_b_help(k, i, []))
             idx = idx + 1
-        
-        return a
+
+        return a[-1][0]
 
     def phi_b_help(self, w, l, r):
 
@@ -125,12 +134,61 @@ class Braid:
             if type(l[0]) == list:
                 a = self.phi_b_help(w, l[0], [])
             else:
-                a = self.phi_ext(w, *l[0])
+                a = self.phi_ext_sk(w, *l[0])
             if len(a) == 1:
                 r.extend(a)
             else:
                 r.append(a)
             return self.phi_b_help(w, l[1:], r)
+
+    def phi_b_ext_a(self):
+        """
+        phi_b_ext_a returns phi_b_ext for all a_ij
+        """
+
+        a = []
+
+        for i in range(0, self.s+1):
+            for j in range(0, self.s+1):
+                a.append(((i, j), self.phi_b_ext(i, j)))
+
+        return dict(a)
+
+    def expand(self, l, r, s):
+
+        if type(l[0]) == list:
+            r.extend(self.expand(l[0], [], -1*s))
+        else:
+            r.append((-1*s, [l[0]]))
+
+        t = []
+        if type(l[1]) == list:
+            a = self.expand(l[1], [], -1*s)
+            if type(l[2]) == list:
+                pass
+            else:
+                for i in a:
+                    x, y = i
+                    y.append(l[2])
+                    t.append((x, y))
+                r.extend(t)
+        else:
+            if type(l[2]) == list:
+                a = self.expand(l[2], [], s)
+                for i in a:
+                    x, y = i
+                    if type(y) == list:
+                        new_l1 = [l[1]]
+                        new_l1.extend(y)
+                        t.append((-1*s*x, new_l1))
+                    else:
+                        t.append((-1*s*x, [l[1], y]))
+            else:
+                t.append((-1*s, [l[1]]))
+                t[-1][1].append(l[2])
+            r.extend(t)
+
+        return r
 
     def phi_ls(self, i):
         s = i-1
@@ -144,42 +202,119 @@ class Braid:
         m[s:s+2, s:s+2] = [[-1*self.a[s, s+1], 1], [-1, 0]]
         return m
 
-    def phi_lb(self):
-        m = self.phi_ls(self.w[0])
-
-        for i in self.w[1:]:
-            m = m*self.phi_ls(i)
-
-        return m
-
-    def phi_rb(self):
-        m = self.phi_rs(self.w[0])
-        
-        for i in self.w[1:]:
-            m = m*self.phi_rs(i)
-
-        return m
-
-#b = Braid(4, 13)
-# print
-# print b.a
-# print
-
-# for k in range(1, 4):
-#     print "sigma_" + str(k)
-#     for i in range(1, 5):
-#         for j in range(1, 5):
-#             print (i, j),
-#             print "=",
-#             print (b.phi_s(k, i, j))
-
 braid = Braid(2, [1, 1, 1])
-# print
-# print braid.astar
-# print
 
-# for i in range(0, 3):
-#     for j in range(0, 3):
-#         print (i, j),
-#         print "=",
-#         print (braid.phi_ext(1, i, j))
+
+def test_expand():
+
+    a = [(0, 2), (0, 1), (1, 2)]
+    r = [(-1, [(0, 2)]), (-1, [(0, 1), (1, 2)])]
+    t = braid.expand(a, [], 1)
+
+    print "test 1:"
+    print "-as2 - as1a12"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "test 1 failed"
+
+    print
+
+    a = [[(0, 2), (0, 1), (1, 2)], (2, 1), (1,  0)]
+    r = [(1, [(0, 2)]), (1, [(0, 1), (1, 2)]), (-1, [(2, 1), (1, 0)])]
+    t = braid.expand(a, [], 1)
+
+    print "test 2:"
+    print "-(-as2 - as1*a12) - a21*a1s"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "test 2 failed"
+
+    print 
+
+    a = [(1, 0), (2, 1), [(0, 1), (1, 2), (2, 0)]]
+    r = [(-1, [(1, 0)]), (1, [(2, 1), (0, 1)]), (1, [(2, 1), (1, 2), (2, 0)])]
+    t = braid.expand(a, [], 1)
+
+    print "test 3:"
+    print "-a1s - a21*(-as1 - a12*a2s)"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "test 3 failed"
+
+    print
+
+    a = [[(2, 0), (2, 1), (1, 0)], (2, 1), [(1, 0), (1, 2), [(2, 0), (2, 1), (1, 0)]]]
+    r = [(1, [(2, 0)]), (1, [(2, 1), (1, 0)]), (1, [(2, 1), (1, 0)]), (-1, [(2, 1), (1, 2), (2, 0)]), (-1, [(2, 1), (1, 2), (2, 1), (1, 0)])]
+    t = braid.expand(a, [], 1)
+
+    print "test 4:"
+    print "-(-a2s - a21*a1s) - a21*(-a1s - a12*(-a2s - a21*a1s))"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "test 4 failed"
+
+    print
+
+    a = [(0, 1), [(0, 2), (0, 1), (1, 2)], (2, 1)]
+    r = [(-1, [(0, 1)]), (1, [(0, 2), (2, 1)]), (1, [(0, 1), (1, 2), (2, 1)])]
+    t = braid.expand(a, [], 1)
+
+    print "test 5:"
+    print "-as1 - (-as2 - as1*a12)*a21"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "test 5 failed"
+
+    print
+
+
+
+braid = Braid(4, 13)
+a = [[1, 0, 0, 0], [0, a14 + a13*a34, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
+m1 = matrix(braid.alg, a)
+b = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, -a41, -1], [0, 0, 1, 0]]
+m2 = matrix(braid.alg, b)
+c = [[a31+a32*a21, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+m3 = matrix(braid.alg, c)
+d = [[1, 0, 0, 0], [0, -a32, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
+m4 = matrix(braid.alg, d)
+i = m1*m2*m3*m4
+
+a = [[-1*a13-a12*a23 + (-1*a14 - a12*a24)*(a43-a41*(-1*a13 - a12*a23) + a42*a23 + a42*(-1*a23-a21*(-a13 - a12*a23)) - (-1*a41 - a42*a21)*(-a13-a12*a23)), -a14-a12*a24, 1, 0],
+     [-1*a32-(-1*a31 + a32*a21*a12) + (-1*a31-a32*a21)*a12, -a23-a21*(-a13-a12*a23), 0, 1],
+     [1, 0, 0, 0],
+     [0, 1, 0, 0]]
+m1 = matrix(braid.alg, a)     
+
+m1*i
+
