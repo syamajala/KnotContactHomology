@@ -7,7 +7,8 @@ class Braid:
     def __init__(self, strands, word):
         self.s = strands
         self.w = word
-        self.alg = FreeAlgebra(ZZ, (self.s+1)*(self.s+1), self.aij(star=True))
+        g = self.gens(star=True)
+        self.alg = FreeAlgebra(ZZ, len(g.split(',')), g)
         self.alg.inject_variables()
 
         m = []
@@ -21,6 +22,63 @@ class Braid:
 
         self.astar = matrix(self.alg, self.s+1, self.s+1, m)
         self.a = matrix(self.alg, self.s, self.s, self.astar[1:self.s+1, 1:self.s+1])
+
+        m = []
+        for i in range(0, self.s):
+            n = []
+            for j in range(0, self.s):
+                n.append(self.alg.gen(k))
+                k = k + 1
+            m.append(n)
+
+        self.b = matrix(self.alg, self.s, self.s, m)
+
+        m = []
+        for i in range(0, self.s):
+            n = []
+            for j in range(0, self.s):
+                n.append(self.alg.gen(k))
+                k = k + 1
+            m.append(n)
+        
+        self.c = matrix(self.alg, self.s, self.s, m)
+
+    def gens(self, star=False):
+        a = ''
+        b = ''
+        c = ''
+        d = ''
+        e = ''
+
+        if not star:
+            start = 1
+        else:
+            start = 0
+
+        for i in range(start, self.s+1):
+            for j in range(start, self.s+1):
+                if star:
+                    if i == 0:
+                        a = a + 'as' + str(j)
+                    elif j == 0:
+                        a = a + 'a' + str(i) + 's'
+                    else:
+                        a = a + 'a'+str(i)+str(j)
+                else:
+                    a = a + 'a'+str(i)+str(j)
+
+                a = a + ','
+
+                if i != 0 and j != 0:
+                    b = b + 'b' + str(i) + str(j) + ','
+                    c = c + 'c' + str(i) + str(j) + ','
+                    d = d + 'd' + str(i) + str(j) + ','
+
+        for i in range(1, self.s+1):
+            e = e + 'e' + str(i) + str(i) + ','
+
+        g = a + b + c + d + e[:-1]
+        return g
 
     def aij(self, star=False):
         a = ''
@@ -159,6 +217,22 @@ class Braid:
 
     def expand_help(self, l, r, s):
 
+        """
+        Basically what we want to do is walk through a list like 
+        l = [(0, 2), (0, 1), (1, 2)] and turn it into something like
+        r = [(-1, [(0, 2)]), (-1, [(0, 1), (1, 2)])], so there are a
+        few different cases. 
+
+        if l[0] is a list then we should expand that, if not then it must be 
+        (1, [(0, 2)]) by definition of phi_b_ext.
+
+        if l[1] is a list, expand that, then if l[2] is a list as well expand
+        it and foil, otherwise multiply each element of l[1] by l[2],
+
+        similarly, if l[2] is a list, multiply each element of l[2] by l[1],
+        otherwise just multiply l[1] and l[2]
+        """
+
         if type(l[0]) == list:
             r.extend(self.expand_help(l[0], [], -1*s))
         else:
@@ -168,7 +242,16 @@ class Braid:
         if type(l[1]) == list:
             a = self.expand_help(l[1], [], -1*s)
             if type(l[2]) == list:
-                print "NEED TO FOIL"
+                b = self.expand_help(l[2], [], s)
+                t = []
+                for i in a:
+                    s_a, els_a = i
+                    for j in b:
+                        n_a = list(els_a)
+                        s_b, els_b = j
+                        n_a.extend(els_b)
+                        t.append((s_a*s_b, n_a))
+                r.extend(t)
             else:
                 for i in a:
                     x, y = i
@@ -261,28 +344,9 @@ class Braid:
         return a
 
 braid = Braid(2, [1, 1, 1])
+braid.phi_lb()
 
-#braid = Braid(4, [2, 1, 3, 2])
-# a = [[1, 0, 0, 0], [0, a14 + a13*a34, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
-# m1 = matrix(braid.alg, a)
-# b = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, -a41, -1], [0, 0, 1, 0]]
-# m2 = matrix(braid.alg, b)
-# c = [[a31+a32*a21, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
-# m3 = matrix(braid.alg, c)
-# d = [[1, 0, 0, 0], [0, -a32, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
-# m4 = matrix(braid.alg, d)
-# i = m1*m2*m3*m4
-
-# a = [[a31 + a32*a21 + a34*(a41+a42*a21) + (a32 - a34*(-a42-(-a41-a42*a21)*a12+(-a31-a32*a21)*a12))*a21, a32-a34*(-a42-(-a41-a42*a21)*a12) + (-a31-a32*a21)*a12, 1, 0],
-#      [a14 + a12*a24 - (a13 + a12*a23 - (-a14 - a12*a24)*a43)*a34 + (a13 + a12*a23 + (a14 + a12*a24)*a43)*a34, a41+a12*a21 - a43*(a31 + a32*a21 - a34*(-a41 - a42*a21)), 0, 1],
-#      [1, 0, 0, 0],
-#      [0, 1, 0, 0]]
-# m1 = matrix(braid.alg, a)
-
-# b = [[-a13+a12*a23 + (-a14 - a12*a24)*a43, -a14-a12*a24, 1, 0], 
-#      [-a32 + a31 + a32*a21*a12 + (-a31-a32*a21)*a12, -a23 + a21*a13 + a21*a12*a23, 0, 1], 
-#      [1, 0, 0, 0], 
-#      [0, 1, 0, 0]]
-# m2 = matrix(braid.alg, b)
-
-# m1*m2*i
+#w = [2, 1, 3, 2]*3
+#w.append(1)
+#braid = Braid(4, w)
+#print braid.phi_lb()

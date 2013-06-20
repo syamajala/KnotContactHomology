@@ -136,5 +136,76 @@ def test_expand():
 
     print
 
+    a = [(1, 0), [(1, 2), (2, 0), (1, 0)], [(2, 1), (1, 0), (2, 0)]]
+    r = [(-1, [(1, 0)]), (-1, [(1, 2), (2, 1)]),
+         (-1, [(1, 2), (1, 0), (2, 0)]), (-1, [(2, 0), (1, 0), (2, 1)]),
+         (-1, [(2, 0), (1, 0), (1, 0), (2, 0)])]
+    t = braid.expand(a)
+
+    print "test 6:"
+    print "-as1 - (-a12 + a2s*a1s)(-a21 - a1s*a2s)"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "FAILED"
+
+    print
+
+    a = [(1, 0), [(1, 2), [(0, 2), (0, 1), (1, 2)], (1, 0)],
+         [(2, 1), (1, 0), (2, 0)]]
+    r = [(-1, [(1, 0)]), (-1, [(1,  2), (2, 1)]), 
+         (-1, [(1, 2), (1, 0), (2, 0)]), 
+         (1, [(0, 2), (1, 0), (2, 1)]), (1, [(0, 2), (1, 0), (1, 0), (2, 0)]),
+         (1, [(0, 1), (1, 2), (1, 0), (2, 1)]), 
+         (1, [(0, 1), (1, 2), (1, 0), (1, 0), (2, 0)])]
+    t = braid.expand(a)
+
+    print "test 7:"
+    print "-a1s - (-a12 - (-as2 - as1*a12)*a1s)*(-a12 - a1s*a2s)"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "FAILED"
+
+    print
+
+    print "test 9:"
+
+    a = [(1, 0), [(1, 2), (2, 0), (1, 0)], [(2, 1), [(0, 2), (0, 1), (1, 2)], 
+                                            (2, 0)]]
+    r = [(-1, [(1, 0)]),
+         (-1, [(1, 2), (2, 1)]),
+         (1, [(1, 2), (0, 2), (2, 0)]),
+         (1, [(1, 2), (0, 1), (1, 2), (2, 0)]),
+         (-1, [(2, 0), (1, 0), (2, 1)]),
+         (1, [(2, 0), (1, 0), (0, 2), (2, 0)]),
+         (1, [(2, 0), (1, 0), (0, 1), (1, 2), (2, 0)])]
+    t = braid.expand(a)
+
+    print "-a1s - (-a12 - a2s*a1s)(-a21 - (-as2 - as1*a12)*a2s)"
+    print "a = " + str(a)
+    print "r = " + str(r)
+    print "t = " + str(t)
+
+    try:
+        assert t == r
+        print "PASS"
+    except AssertionError:
+        print "FAILED"
+
+    print
+
+
 test_phi_b_ext()
 test_expand()
+
