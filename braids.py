@@ -119,36 +119,21 @@ class Braid:
         a = deque(self.phi_ext_sk(self.w[0], i, j))
         head = deque([a.popleft()])
 
-        # print "a = " + str(a)
-        # print "head = " + str(head)
-
         for i in self.w[1:]:
-            # print 
-            # print "i = " + str(i)
             for n in range(len(head)):
-                # print "old head = " + str(head)
                 s, e = head.popleft()
-                # print "e = " + str([s, [e]])
                 r = []
                 for j in range(0, len(e), 2):
                     r.append(self.phi_ext_sk(i, e[j], e[j+1]))
-                # print "r = " + str(r)
                 head.extend(self.expand(s, r))
-                # print "new head = " + str(head)
 
         for i in self.w[1:]:
-            # print 
-            # print "i = " + str(i)
             for n in range(len(a)):
-                # print "old a = " + str(a)
                 s, e = a.popleft()
-                # print "e = " + str([s, [e]])
                 r = []
                 for j in range(0, len(e), 2):
                     r.append(self.phi_ext_sk(i, e[j], e[j+1]))
-                # print "r = " + str(r)
                 a.extend(self.expand(s, r))
-                # print "new a = " + str(a)
 
         return list(head) + list(a)
 
@@ -194,6 +179,23 @@ class Braid:
                     a.append([old_s*j[0], new_e])
         return a
 
+    def simplify(self, l):
+        a = []
+        skip = []
+
+        for i in l:
+            c = l.count(i)
+            if c > 1 and i not in skip:
+                s, e = i
+                a.append([s*c, e])
+                skip.append(i)
+            elif i in skip:
+                pass
+            else:
+                a.append(i)
+
+        return a
+
     def astar_el(self, l):
         a = 0
         for i in l:
@@ -205,12 +207,83 @@ class Braid:
 
         return a
 
-braid = Braid(2, [1, 1, 1])
-print
-a = braid.phi_b_ext(0, 1)
-print braid.astar_el(a)
+    def phi_l_b_ij(self, p, q, simplify=True):
 
-# w = [2, 1, 3, 2]*3
-# w.append(1)
-# braid2 = Braid(4, w)
-# print braid2.astar_el(braid2.phi_b_ext(1, 0))
+        l = self.phi_b_ext(p, 0)
+        if simplify:
+            l = self.simplify(l)
+        a = []
+
+        for i in l:
+            s, e = i
+            for j in range(0, len(e), 2):
+                if e[j] == q and e[j+1] == 0:
+                    a.append([s, e[:j]+e[j+2:]])
+
+        return a
+
+    def phi_l_b(self):
+
+        a = []
+        
+        for i in range(1, self.s+1):
+            a.append([])
+            for j in range(1, self.s+1):
+                a[-1].append(self.astar_el(self.phi_l_b_ij(i, j, 
+                                                           simplify=False)))
+
+        return matrix(self.alg, a)
+
+    def phi_r_b_ij(self, p, q, simplify=True):
+        
+        if p == q:
+            l = self.phi_l_b_ij(p, q, simplify)
+        else:
+            l = self.phi_l_b_ij(q, p, simplify)
+
+        for i in l:
+            s, e = i
+            e.reverse()
+
+        return l
+
+    def phi_r_b(self):
+
+        a = []
+        
+        for i in range(1, self.s+1):
+            a.append([])
+            for j in range(1, self.s+1):
+                a[-1].append(self.astar_el(self.phi_r_b_ij(i, j, 
+                                                           simplify=False)))
+
+        return matrix(self.alg, a)
+    
+    def diffb(self):
+
+        i = identity_matrix(self.s)
+        p = self.phi_l_b()
+        return (i - p)*self.a
+
+    def diffc(self):
+
+        i = identity_matrix(self.s)
+        p = self.phi_r_b()
+        return self.a*(i - p)
+
+    def diffd(self):
+
+        i = identity.matrix(self.s)
+        pl = self.phi_l_b()
+        pr = self.phi_r_b()
+        return (self.b*(1 - pr)) - ((1 - pl)*self.c)
+        
+# braid = Braid(2, [1, 1, 1])
+# print
+# print braid.phi_ext_sk(1, 1, 0)
+# print braid.diffb()
+
+w = [2, 1, 3, 2]*3
+w.append(1)
+braid2 = Braid(4, w)
+print braid2.phi_l_b()
