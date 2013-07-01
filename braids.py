@@ -5,44 +5,55 @@ from collections import deque
 
 class Braid:
 
-    def __init__(self, strands, word):
+    def __init__(self, strands, word, diag=[]):
         self.s = strands
         self.w = word
+        self.br = PolynomialRing(ZZ, 'l, li, nm, mi')
+        self.br.inject_variables()
         g = self.gens(star=True)
-        self.alg = FreeAlgebra(ZZ, len(g.split(',')), g)
+        self.alg = FreeAlgebra(self.br, len(g.split(',')), g)
         self.alg.inject_variables()
 
-        m = []
-        k = 0
-        for i in range(0, self.s+1):
-            n = []
-            for j in range(0, self.s+1):
-                n.append(self.alg.gen(k))
-                k = k + 1
-            m.append(n)
+        g = iter(range(len(self.alg.gens())))
+
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s+1)] 
+             for i in range(0, self.s+1)]
 
         self.astar = matrix(self.alg, self.s+1, self.s+1, m)
-        self.a = matrix(self.alg, self.s, self.s, self.astar[1:self.s+1, 1:self.s+1])
+        
+        if diag:
+            d = iter(diag)
+            m = []
+            for i in range(1, self.s+1):
+                n = []
+                for j in range(1, self.s+1):
+                    if i == j:
+                        n.append(d.next())
+                    else:
+                        n.append(self.astar[i, j])
+                m.append(n)
+            self.a = matrix(self.alg, self.s, self.s, m)
+        else:
+            self.a = matrix(self.alg, self.s, self.s, 
+                            self.astar[1:self.s+1, 1:self.s+1])
 
-        m = []
-        for i in range(0, self.s):
-            n = []
-            for j in range(0, self.s):
-                n.append(self.alg.gen(k))
-                k = k + 1
-            m.append(n)
-
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s)] 
+             for i in range(0, self.s)]
         self.b = matrix(self.alg, self.s, self.s, m)
 
-        m = []
-        for i in range(0, self.s):
-            n = []
-            for j in range(0, self.s):
-                n.append(self.alg.gen(k))
-                k = k + 1
-            m.append(n)
-        
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+             for i in range(0, self.s)]
         self.c = matrix(self.alg, self.s, self.s, m)
+
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+             for i in range(0, self.s)]
+        self.d = matrix(self.alg, self.s, self.s, m)
+
+        m = identity_matrix(self.alg, self.s)
+        for i in range(0, self.s):
+            m[i, i] = self.alg.gen(g.next())
+
+        self.e = matrix(self.alg, self.s, self.s, m)
 
     def gens(self, star=False):
         a = ''
@@ -177,6 +188,7 @@ class Braid:
                     new_e = list(old_e)
                     new_e.extend(j[1])
                     a.append([old_s*j[0], new_e])
+
         return a
 
     def simplify(self, l):
@@ -263,27 +275,39 @@ class Braid:
 
         i = identity_matrix(self.s)
         p = self.phi_l_b()
+
         return (i - p)*self.a
 
     def diffc(self):
 
         i = identity_matrix(self.s)
         p = self.phi_r_b()
+
         return self.a*(i - p)
 
     def diffd(self):
 
-        i = identity.matrix(self.s)
+        i = identity_matrix(self.s)
         pl = self.phi_l_b()
         pr = self.phi_r_b()
-        return (self.b*(1 - pr)) - ((1 - pl)*self.c)
-        
-# braid = Braid(2, [1, 1, 1])
-# print
-# print braid.phi_ext_sk(1, 1, 0)
-# print braid.diffb()
 
-w = [2, 1, 3, 2]*3
-w.append(1)
-braid2 = Braid(4, w)
-print braid2.phi_l_b()
+        return (self.b*(i - pr)) - ((i - pl)*self.c)
+
+    def diffe(self):
+        
+        return self.b + (self.phi_l_b()*self.c)
+
+braid = Braid(2, [1, 1, 1], [-2, -2])
+print
+print braid.diffb()
+print
+print braid.diffc()
+print
+print braid.diffd()
+print
+print braid.diffe()
+
+# w = [2, 1, 3, 2]*3
+# w.append(1)
+# braid2 = Braid(4, w)
+# print braid2.phi_l_b()
