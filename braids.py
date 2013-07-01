@@ -1,17 +1,25 @@
 #!/usr/bin/sage -python
 from sage.all import *
-from collections import deque
+from collections import deque, Counter
 
 
 class Braid:
 
-    def __init__(self, strands, word, diag=[]):
+    def __init__(self, strands, word, polyring=False, diag=0):
         self.s = strands
         self.w = word
-        self.br = PolynomialRing(ZZ, 'l, li, nm, mi')
-        self.br.inject_variables()
+        self.polyring = polyring
         g = self.gens(star=True)
-        self.alg = FreeAlgebra(self.br, len(g.split(',')), g)
+
+        if self.polyring:
+            r = PolynomialRing(ZZ, 'lmb, lmbinv, mu, muinv, U, Uinv')
+            ideal = r.ideal(r.gen(0)*r.gen(1)-1, r.gen(2)*r.gen(3)-1, 
+                            r.gen(4)*r.gen(5)-1)
+            self.br = QuotientRing(r, ideal, 'lmb, lmbinv, mu, muinv, U, Uinv')
+            self.br.inject_variables()
+            self.alg = FreeAlgebra(self.br, len(g.split(',')), g)
+        else:
+            self.alg = FreeAlgebra(ZZ, len(g.split(',')), g)
         self.alg.inject_variables()
 
         g = iter(range(len(self.alg.gens())))
@@ -20,27 +28,11 @@ class Braid:
              for i in range(0, self.s+1)]
 
         self.astar = matrix(self.alg, self.s+1, self.s+1, m)
-        
-        if diag:
-            d = iter(diag)
-            m = []
-            for i in range(1, self.s+1):
-                n = []
-                for j in range(1, self.s+1):
-                    if i == j:
-                        n.append(d.next())
-                    else:
-                        n.append(self.astar[i, j])
-                m.append(n)
-            self.a = matrix(self.alg, self.s, self.s, m)
-        else:
-            self.a = matrix(self.alg, self.s, self.s, 
-                            self.astar[1:self.s+1, 1:self.s+1])
 
         m = [[self.alg.gen(g.next()) for j in range(0, self.s)] 
              for i in range(0, self.s)]
         self.b = matrix(self.alg, self.s, self.s, m)
-
+        
         m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
              for i in range(0, self.s)]
         self.c = matrix(self.alg, self.s, self.s, m)
@@ -49,11 +41,103 @@ class Braid:
              for i in range(0, self.s)]
         self.d = matrix(self.alg, self.s, self.s, m)
 
-        m = identity_matrix(self.alg, self.s)
-        for i in range(0, self.s):
-            m[i, i] = self.alg.gen(g.next())
+        if diag and not self.polyring:
+            m = []
+            for i in range(1, self.s+1):
+                n = []
+                for j in range(1, self.s+1):
+                    if i == j:
+                        n.append(diag)
+                    else:
+                        n.append(self.astar[i, j])
+                m.append(n)
+            self.a = matrix(self.alg, self.s, self.s, m)
 
-        self.e = matrix(self.alg, self.s, self.s, m)
+            m = identity_matrix(self.alg, self.s)
+            for i in range(0, self.s):
+                m[i, i] = self.alg.gen(g.next())
+
+            self.e = matrix(self.alg, self.s, self.s, m)
+
+        elif self.polyring:
+            m = []
+            for i in range(1, self.s+1):
+                n = []
+                for j in range(1, self.s+1):
+                    if i < j:
+                        n.append(-1*mu*self.astar[i, j])
+                    elif i == j:
+                        n.append(mu-1)
+                    elif i > j:
+                        n.append(self.astar[i, j])
+                m.append(n)
+            self.a = matrix(self.alg, self.s, self.s, m)
+            
+            m = []
+            for i in range(1, self.s+1):
+                n = []
+                for j in range(1, self.s+1):
+                    if i < j:
+                        n.append(-1*mu*U*self.astar[i, j])
+                    elif i == j:
+                        n.append(mu*U-1)
+                    elif i > j:
+                        n.append(self.astar[i, j])
+                m.append(n)
+
+            self.ahat = matrix(self.alg, self.s, self.s, m)
+
+            m = []
+            for i in range(0, self.s):
+                n = []
+                for j in range(0, self.s):
+                    if i > j:
+                        n.append(self.b[i, j])
+                    elif i == j:
+                        n.append(0)
+                    elif i < j:
+                        n.append(-mu*self.b[i, j])
+                m.append(n)
+
+            self.b = matrix(self.alg, self.s, self.s, m)
+
+            m = []
+            for i in range(0, self.s):
+                n = []
+                for j in range(0, self.s):
+                    if i > j:
+                        n.append(self.b[i, j])
+                    elif i == j:
+                        n.append(0)
+                    elif i < j:
+                        n.append(U*self.b[i, j])
+                m.append(n)
+
+            self.bhat = matrix(self.alg, self.s, self.s, m)
+
+            m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+                 for i in range(0, self.s)]
+            self.e = matrix(self.alg, self.s, self.s, m)
+
+            m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+                 for i in range(0, self.s)]
+            self.f = matrix(self.alg, self.s, self.s, m)
+
+            self.writhe = 0
+            for k, v in Counter(self.w).items():
+                self.writhe = self.writhe + v
+
+            self.cl = identity_matrix(self.alg, self.s)
+            self.cl[0, 0] = lmb*((-1*muinv)**self.writhe)*(Uinv**((self.writhe-self.s+1)/2))
+            self.cli = identity_matrix(self.alg, self.s)
+            self.cli[0, 0] = lmbinv*((-1*mu)**self.writhe)*(U**((self.writhe-self.s+1)/2))
+
+        else:
+            self.a = matrix(self.alg, self.s, self.s, 
+                            self.astar[1:self.s+1, 1:self.s+1])
+
+        self.phi_l_bm = None
+        self.phi_r_bm = None
 
     def gens(self, star=False):
         a = ''
@@ -61,6 +145,7 @@ class Braid:
         c = ''
         d = ''
         e = ''
+        f = ''
 
         if not star:
             start = 1
@@ -86,10 +171,21 @@ class Braid:
                     c = c + 'c' + str(i) + str(j) + ','
                     d = d + 'd' + str(i) + str(j) + ','
 
-        for i in range(1, self.s+1):
-            e = e + 'e' + str(i) + str(i) + ','
+        g = a + b + c + d
 
-        g = a + b + c + d + e[:-1]
+        if self.polyring:
+            for i in range(1, self.s+1):
+                for j in range(1, self.s+1):
+                    e = e + 'e' + str(i) + str(j) + ','
+            for i in range(1, self.s+1):
+                for j in range(1, self.s+1):
+                    f = f + 'f' + str(i) + str(j) + ','
+            g = g + e + f[:-1]
+        else:
+            for i in range(1, self.s+1):
+                e = e + 'e' + str(i) + str(i) + ','
+            g = g + e[:-1]
+
         return g
 
     def phi_ext_sk(self, z, x, y):
@@ -208,6 +304,10 @@ class Braid:
 
         return a
 
+    def linearize(self, l):
+
+        pass
+
     def astar_el(self, l):
         a = 0
         for i in l:
@@ -236,15 +336,14 @@ class Braid:
 
     def phi_l_b(self):
 
-        a = []
-        
-        for i in range(1, self.s+1):
-            a.append([])
-            for j in range(1, self.s+1):
-                a[-1].append(self.astar_el(self.phi_l_b_ij(i, j, 
-                                                           simplify=False)))
+        if self.phi_l_bm:
+            return self.phi_l_bm
 
-        return matrix(self.alg, a)
+        a = [[self.astar_el(self.phi_l_b_ij(i, j, simplify=False)) for j in range(1, self.s+1)] 
+             for i in range(1, self.s+1)]
+        self.phi_l_bm = matrix(self.alg, a)
+
+        return self.phi_l_bm
 
     def phi_r_b_ij(self, p, q, simplify=True):
         
@@ -261,43 +360,110 @@ class Braid:
 
     def phi_r_b(self):
 
-        a = []
-        
-        for i in range(1, self.s+1):
-            a.append([])
-            for j in range(1, self.s+1):
-                a[-1].append(self.astar_el(self.phi_r_b_ij(i, j, 
-                                                           simplify=False)))
+        if self.phi_r_bm:
+            return self.phi_r_bm
 
-        return matrix(self.alg, a)
+        a = [[self.astar_el(self.phi_r_b_ij(i, j, simplify=False)) for j in range(1, self.s+1)] 
+             for i in range(1, self.s+1)]
+        self.phi_r_bm = matrix(self.alg, a)
+        
+        return self.phi_r_bm
+
+    def lmult(self, r, c):
+
+        pass
+
+    def rmult(self, r, c):
+
+        pass
+
+    def diffa(self):
+
+        return matrix(self.alg, self.s, self.s)
     
     def diffb(self):
 
+        # m = []
+
+        # for i in range(1, self.s+1):
+        #     n = []
+        #     for j in range(1, self.s+1):
+        #         a = self.phi_l_b_ij(i, j)
+        #         if i == j:
+        #             for k in range(len(a)):
+        #                 a[k][0] = a[k][0]*-1
+        #             a.append([-1, []])
+        #         n.appennd(a)
+        #     m.append(n)
+        
+        # return m
+
         i = identity_matrix(self.s)
         p = self.phi_l_b()
+
+        if self.polyring:
+            phi_b = p*self.a*self.phi_r_b()
 
         return (i - p)*self.a
 
     def diffc(self):
 
-        i = identity_matrix(self.s)
+        # m = []
+
+        # for i in range(1, self.s+1):
+        #     n = []
+        #     for j in range(1, self.s+1):
+        #         a = self.phi_r_b_ij(i, j)
+        #         if i == j:
+        #             for k in range(len(a)):
+        #                 a[k][0] = a[k][0]*-1
+        #             a.append([-1, []])
+        #         n.append(a)
+        #     m.append(n)
+
+        # return m
+
         p = self.phi_r_b()
 
+        if self.polyring:
+            return self.ahat - (self.cl*p*self.a)
+
+        i = identity_matrix(self.s)
         return self.a*(i - p)
 
     def diffd(self):
 
-        i = identity_matrix(self.s)
-        pl = self.phi_l_b()
         pr = self.phi_r_b()
 
+        if self.polyring:
+            return self.a - (self.ahat*pr*self.cli)
+
+        i = identity_matrix(self.s)
+        pl = self.phi_l_b()
         return (self.b*(i - pr)) - ((i - pl)*self.c)
 
     def diffe(self):
         
+        if self.polyring:
+            return self.bhat - self.c - (self.cl*self.phi_l_b()*self.d)
+
         return self.b + (self.phi_l_b()*self.c)
 
-braid = Braid(2, [1, 1, 1], [-2, -2])
+    def difff(self):
+        
+        if self.polyring:
+            return self.b - self.d - (self.c*self.phi_r_b()*self.cli)
+
+        return matrix(self.alg, self.s, self.s)
+
+braid = Braid(2, [1, 1, 1], polyring=True)
+print
+print braid.phi_l_b()
+
+# w = [2, 1, 3, 2]*3
+# w.append(1)
+# braid = Braid(4, w, polyring=True)
+
 print
 print braid.diffb()
 print
@@ -306,8 +472,3 @@ print
 print braid.diffd()
 print
 print braid.diffe()
-
-# w = [2, 1, 3, 2]*3
-# w.append(1)
-# braid2 = Braid(4, w)
-# print braid2.phi_l_b()
