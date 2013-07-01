@@ -1,4 +1,0 @@
-for i in CartesianProduct(range(0, 4), range(0, 4)):
-    print i
-
-print range(0, 9)
