@@ -397,6 +397,7 @@ class Braid:
 
         return r
 
+    # parallelize this?
     def phi_l_b(self):
 
         if self.phi_l_bm:
@@ -446,7 +447,6 @@ class Braid:
 
         return matrix(self.alg, self.s, self.s)
     
-    @profile
     def diffb(self):
 
         p = self.phi_l_b()
@@ -520,7 +520,7 @@ class Braid:
         cdict = dict(cdict)
         r = self.s*self.s*2
         c = g.next()
-        p = matrix(braid.alg, r, c)
+        p = matrix(r, c)
 
         row = 0
 
@@ -538,16 +538,18 @@ class Braid:
                 p[row, cdict[k]] = v
             row = row + 1
 
-        return p
+        return p.smith_form()[0]
 
-# braid = Braid(2, [1, 1, 1], polyring=False, linear=True, diag=-2)
+braid = Braid(2, [1, 1, 1], polyring=False, linear=True, diag=-2)
+p = braid.zero_homology()
+print p.str()
+
+# w = [2, 1, 3, 2]*3
+# w.append(1)
+# braid = Braid(4, w, polyring=False, diag=-2, linear=True)
 # p = braid.zero_homology()
-
-w = [2, 1, 3, 2]*3
-w.append(1)
-braid = Braid(4, w, polyring=False, diag=-2, linear=True)
-
-braid.diffb()
+# print p
+# braid.diffb()
 # print
 # print braid.diffb()
 # print
