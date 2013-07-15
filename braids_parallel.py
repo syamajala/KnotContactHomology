@@ -85,6 +85,8 @@ def linearize(args):
                 else:
                     g2 = braid.alg.gen(els[1][0])
                     e = -2*g1 - 2*g2 - 4
+                    if els[1][1] != 1:
+                        e = e*(g2**(els[1][1]-1))
                     for g, p in els[2:]:
                         e = e*(braid.alg.gen(g)**p)
 
@@ -116,66 +118,72 @@ def linearize(args):
 
 class Braid:
 
-    def __init__(self, strands, word, polyring=False, diag=0, linear=True):
+    def __init__(self, strands, word, polyring=False, linear=True):
         self.s = strands
         self.w = word
         self.polyring = polyring
         self.linear = linear
         g = self.gens(star=True)
 
-        if self.polyring:
+        if self.polyring and not linear:
             r = PolynomialRing(ZZ, 'lmb, lmbinv, mu, muinv, U, Uinv')
             ideal = r.ideal(r.gen(0)*r.gen(1)-1, r.gen(2)*r.gen(3)-1, 
                             r.gen(4)*r.gen(5)-1)
             self.br = QuotientRing(r, ideal, 'lmb, lmbinv, mu, muinv, U, Uinv')
             self.br.inject_variables()
             self.alg = FreeAlgebra(self.br, len(g.split(',')), g)
+        elif self.polyring and linear:
+            r = PolynomialRing(ZZ, 'mu, muinv')
+            ideal = r.ideal(r.gen(0)*r.gen(1)-1)
+            self.br = QuotientRing(r, ideal, 'mu, muinv')
+            self.br.inject_variables()
+            self.alg = FreeAlgebra(self.br, len(g.split(',')), g)
         else:
             self.alg = FreeAlgebra(ZZ, len(g.split(',')), g)
         self.alg.inject_variables()
 
-        g = iter(xrange(len(self.alg.gens())))
+        g = iter(range(len(self.alg.gens())))
 
-        m = [[self.alg.gen(g.next()) for j in xrange(0, self.s+1)] 
-             for i in xrange(0, self.s+1)]
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s+1)] 
+             for i in range(0, self.s+1)]
 
         self.astar = matrix(self.alg, self.s+1, self.s+1, m)
 
-        m = [[self.alg.gen(g.next()) for j in xrange(0, self.s)] 
-             for i in xrange(0, self.s)]
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s)] 
+             for i in range(0, self.s)]
         self.b = matrix(self.alg, self.s, self.s, m)
         
-        m = [[self.alg.gen(g.next()) for j in xrange(0, self.s)]
-             for i in xrange(0, self.s)]
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+             for i in range(0, self.s)]
         self.c = matrix(self.alg, self.s, self.s, m)
 
-        m = [[self.alg.gen(g.next()) for j in xrange(0, self.s)]
-             for i in xrange(0, self.s)]
+        m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+             for i in range(0, self.s)]
         self.d = matrix(self.alg, self.s, self.s, m)
 
-        if diag and not self.polyring:
+        if not self.polyring and linear:
             m = []
-            for i in xrange(1, self.s+1):
+            for i in range(1, self.s+1):
                 n = []
-                for j in xrange(1, self.s+1):
+                for j in range(1, self.s+1):
                     if i == j:
-                        n.append(diag)
+                        n.append(-2)
                     else:
                         n.append(self.astar[i, j])
                 m.append(n)
             self.a = matrix(self.alg, self.s, self.s, m)
 
             m = identity_matrix(self.alg, self.s)
-            for i in xrange(0, self.s):
+            for i in range(0, self.s):
                 m[i, i] = self.alg.gen(g.next())
 
             self.e = matrix(self.alg, self.s, self.s, m)
 
         elif self.polyring:
             m = []
-            for i in xrange(1, self.s+1):
+            for i in range(1, self.s+1):
                 n = []
-                for j in xrange(1, self.s+1):
+                for j in range(1, self.s+1):
                     if i < j:
                         n.append(-1*mu*self.astar[i, j])
                     elif i == j:
@@ -184,25 +192,11 @@ class Braid:
                         n.append(self.astar[i, j])
                 m.append(n)
             self.a = matrix(self.alg, self.s, self.s, m)
-            
-            m = []
-            for i in xrange(1, self.s+1):
-                n = []
-                for j in xrange(1, self.s+1):
-                    if i < j:
-                        n.append(-1*mu*U*self.astar[i, j])
-                    elif i == j:
-                        n.append(mu*U-1)
-                    elif i > j:
-                        n.append(self.astar[i, j])
-                m.append(n)
-
-            self.ahat = matrix(self.alg, self.s, self.s, m)
 
             m = []
-            for i in xrange(0, self.s):
+            for i in range(0, self.s):
                 n = []
-                for j in xrange(0, self.s):
+                for j in range(0, self.s):
                     if i > j:
                         n.append(self.b[i, j])
                     elif i == j:
@@ -213,40 +207,92 @@ class Braid:
 
             self.b = matrix(self.alg, self.s, self.s, m)
 
-            m = []
-            for i in xrange(0, self.s):
-                n = []
-                for j in xrange(0, self.s):
-                    if i > j:
-                        n.append(self.b[i, j])
-                    elif i == j:
-                        n.append(0)
-                    elif i < j:
-                        n.append(U*self.b[i, j])
-                m.append(n)
-
-            self.bhat = matrix(self.alg, self.s, self.s, m)
-
-            m = [[self.alg.gen(g.next()) for j in xrange(0, self.s)]
-                 for i in xrange(0, self.s)]
-            self.e = matrix(self.alg, self.s, self.s, m)
-
-            m = [[self.alg.gen(g.next()) for j in xrange(0, self.s)]
-                 for i in xrange(0, self.s)]
-            self.f = matrix(self.alg, self.s, self.s, m)
+            self.cl = identity_matrix(self.alg, self.s)
+            self.cli = identity_matrix(self.alg, self.s)
 
             self.writhe = 0
             for k, v in Counter(self.w).iteritems():
-                self.writhe = self.writhe + v
+                if k > 0:
+                    self.writhe = self.writhe + v
+                elif k < 0:
+                    self.writhe = self.writhe - v
 
-            self.cl = identity_matrix(self.alg, self.s)
-            self.cl[0, 0] = lmb*((-1*muinv)**self.writhe)*(Uinv**((self.writhe-self.s+1)/2))
-            self.cli = identity_matrix(self.alg, self.s)
-            self.cli[0, 0] = lmbinv*((-1*mu)**self.writhe)*(U**((self.writhe-self.s+1)/2))
+            if not self.linear:
+                m = []
+                for i in range(1, self.s+1):
+                    n = []
+                    for j in range(1, self.s+1):
+                        if i < j:
+                            n.append(-1*mu*U*self.astar[i, j])
+                        elif i == j:
+                            n.append(mu*U-1)
+                        elif i > j:
+                            n.append(self.astar[i, j])
+                    m.append(n)
 
-        else:
-            self.a = matrix(self.alg, self.s, self.s, 
-                            self.astar[1:self.s+1, 1:self.s+1])
+                self.ahat = matrix(self.alg, self.s, self.s, m)
+
+                m = []
+                for i in range(0, self.s):
+                    n = []
+                    for j in range(0, self.s):
+                        if i > j:
+                            n.append(self.b[i, j])
+                        elif i == j:
+                            n.append(0)
+                        elif i < j:
+                            n.append(U*self.b[i, j])
+                    m.append(n)
+
+                self.bhat = matrix(self.alg, self.s, self.s, m)
+
+                if (self.writhe-self.s+1)/2 < 0:
+                    self.cl[0, 0] = lmb*((-1*muinv)**self.writhe)*(U**(-1*(self.writhe-self.s+1)/2))
+                    self.cli[0, 0] = lmbinv*((-1*mu)**self.writhe)*(Uinv**(-1*(self.writhe-self.s+1)/2))
+                else:
+                    self.cl[0, 0] = lmb*((-1*muinv)**self.writhe)*(Uinv**((self.writhe-self.s+1)/2))
+                    self.cli[0, 0] = lmbinv*((-1*mu)**self.writhe)*(U**((self.writhe-self.s+1)/2))
+
+            elif self.linear:
+
+                m = []
+                for i in range(1, self.s+1):
+                    n = []
+                    for j in range(1, self.s+1):
+                        if i < j:
+                            n.append(-1*mu*self.astar[i, j])
+                        elif i == j:
+                            n.append(mu-1)
+                        elif i > j:
+                            n.append(self.astar[i, j])
+                    m.append(n)
+
+                self.ahat = matrix(self.alg, self.s, self.s, m)
+
+                m = []
+                for i in range(0, self.s):
+                    n = []
+                    for j in range(0, self.s):
+                        if i > j:
+                            n.append(self.b[i, j])
+                        elif i == j:
+                            n.append(0)
+                        elif i < j:
+                            n.append(-mu*self.b[i, j])
+                    m.append(n)
+
+                self.bhat = matrix(self.alg, self.s, self.s, m)
+
+                self.cl[0, 0] = (-1*muinv)**self.writhe
+                self.cli[0, 0] = (-1*mu)**self.writhe
+
+            m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+                 for i in range(0, self.s)]
+            self.e = matrix(self.alg, self.s, self.s, m)
+
+            m = [[self.alg.gen(g.next()) for j in range(0, self.s)]
+                 for i in range(0, self.s)]
+            self.f = matrix(self.alg, self.s, self.s, m)
 
         self.phi_l_bm = None
         self.phi_r_bm = None
@@ -292,10 +338,6 @@ class Braid:
         self.gdictf = dict(self.gdictf)
         
         self.i = identity_matrix(self.alg, self.s)
-        self.db = None
-        self.dc = None
-        self.dd = None
-        self.de = None
 
     def gens(self, star=False):
         a = ''
@@ -433,9 +475,6 @@ class Braid:
 
     def linearizem(self, m, constants=False):
 
-        # a = [[self.linearize(m[i, j], constants) for j in xrange(0, self.s)] 
-        #      for i in xrange(0, self.s)]
-
         dview.push(dict(braid=self))
         l = CartesianProduct(xrange(0, self.s), xrange(0, self.s))
         r = Reference('braid')
@@ -468,9 +507,6 @@ class Braid:
             x, y = i
             args.append((r, x, y))
 
-        # a = [[self.phi_l_b_ij(i, j) for j in xrange(1, self.s+1)]
-        #      for i in xrange(1, self.s+1)]
-
         a = dview.map_sync(phi_l_b_ij, args)
         m = matrix(self.alg, self.s, self.s)
         
@@ -495,9 +531,6 @@ class Braid:
             x, y = i
             args.append((r, x, y))
 
-        # a = [[self.phi_r_b_ij(i, j) for j in xrange(1, self.s+1)] 
-        #      for i in xrange(1, self.s+1)]
-
         a = dview.map_sync(phi_r_b_ij, args)
         m = matrix(self.alg, self.s, self.s)
         
@@ -511,84 +544,80 @@ class Braid:
     def diffa(self):
 
         return matrix(self.alg, self.s, self.s)
-
+    
     def diffb(self):
-
-        if self.db:
-            return self.db
 
         p = self.phi_l_b()
 
-        if self.linear:
+        if self.linear and not self.polyring:
             m = (self.i - p)*self.a
-            self.db = self.linearizem(m)
-            return self.db
-
-        if self.polyring:
+            return self.linearizem(m)
+        elif self.linear and self.polyring:
             phi_b = p*self.a*self.phi_r_b()
-            self.db = self.a - (self.cl*phi_b*cli)
-            return self.db
-
-        self.db = (self.i - p)*self.a
-        return self.db
+            m = self.a - (self.cl*phi_b*self.cli)
+            return self.linearizem(m)
+        elif self.polyring:
+            phi_b = p*self.a*self.phi_r_b()
+            return self.a - (self.cl*phi_b*self.cli)
+        else:
+            return (self.i - p)*self.a
 
     def diffc(self):
 
-        if self.dc:
-            return self.dc
-
         p = self.phi_r_b()
 
-        if self.polyring:
-            self.dc = self.ahat - (self.cl*p*self.a)
-            return self.dc
-
-        if self.linear:
+        if self.linear and not self.polyring:
             m = self.a*(self.i - p)
-            self.dc = self.linearizem(m)
-            return self.dc
-
-        self.dc = self.a*(self.i - p)
-        return self.dc
+            return self.linearizem(m)
+        elif self.linear and self.polyring:
+            m = self.ahat - (self.cl*p*self.a)
+            return self.linearizem(m)
+        elif self.polyring and not self.linear:
+            return self.ahat - (self.cl*p*self.a)
+        else:
+            return self.a*(self.i - p)
 
     def diffd(self):
 
-        if self.dd:
-            return self.dd
-
         pr = self.phi_r_b()
 
-        if self.polyring:
-            self.dd = self.a - (self.ahat*pr*self.cli)
-            return self.dd
-
-        pl = self.phi_l_b()
-        self.dd = (self.b*(self.i - pr)) - ((self.i - pl)*self.c)
-        return self.dd
+        if self.linear and not self.polyring:
+            pl = self.phi_l_b()
+            m = (self.b*(self.i - pr)) - ((self.i - pl)*self.c)
+            return self.linearizem(m)
+        elif self.linear and self.polyring:
+            m = self.a - (self.ahat*pr*self.cli)
+            return self.linearizem(m)
+        elif self.polyring and not self.linear:
+            return self.a - (self.ahat*pr*self.cli)
+        else:
+            return (self.b*(self.i - pr)) - ((self.i - pl)*self.c)
 
     def diffe(self):
         
-        if self.de:
-            return self.de
+        pl = self.phi_l_b()
 
-        if self.polyring:
-            self.de = self.bhat - self.c - (self.cl*self.phi_l_b()*self.d)
-            return self.de
-
-        self.de = self.b + (self.phi_l_b()*self.c)
-        return self.de
+        if self.linear and not self.polyring:
+            m =  self.b + (pl*self.c)
+            return self.linearizem(m)
+        elif self.linear and self.polyring:
+            m = self.bhat - self.c - (self.cl*pl*self.d)
+            return self.linearizem(m)
+        elif self.polyring and not self.linear:
+            return self.bhat - self.c - (self.cl*pl*self.d)
+        else:
+            return self.b + (self.phi_l_b()*self.c)
 
     def difff(self):
-        
-        if self.df:
-            return self.df
+        pr = self.phi_r_b()
 
-        if self.polyring:
-            self.df = self.b - self.d - (self.c*self.phi_r_b()*self.cli)
-            return self.df
-
-        self.df = matrix(self.alg, self.s, self.s)
-        return self.df
+        if self.polyring and self.linear:
+            m = self.b - self.d - (self.c*pr*self.cli)
+            return self.linearizem(m)
+        elif self.polyring and not self.linear:
+            return self.b - self.d - (self.c*pr*self.cli)
+        else:
+            return matrix(self.alg, self.s, self.s)
 
     def zero_homology(self):
 
@@ -632,48 +661,6 @@ class Braid:
 
         return p.smith_form()[0]
 
-    def first_homology(self):
-
-        db = self.diffb()
-        dc = self.diffc()
-        dd = self.diffd()
-        de = self.diffe()
-
-        cdict = []
-        g = iter(count(0))
-        for e in list(self.alg.monoid().gens())[(self.s+1)**2:]:
-
-            s = str(e)
-            i = s[1]
-            j = s[2]
-
-            if s[0] != 'b' and s[0] != 'c':
-                break
-            else:
-                cdict.append((e, g.next()))
-
-        cdict = dict(cdict)
-        r = (self.s**2)+(self.s**2)-2
-        c = g.next()
-        p = matrix(r, c)
-
-        row = 0
-
-        for e in CartesianProduct(xrange(0, self.s), xrange(0, self.s)):
-            i, j = e
-            diff =  db[i, j]
-            for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
-                p[row, cdict[k]] = v
-            row = row + 1
-
-        for e in CartesianProduct(xrange(0, self.s), xrange(0, self.s)):
-            i, j = e
-            diff =  dc[i, j]
-            for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
-                p[row, cdict[k]] = v
-            row = row + 1
-
-        return p.smith_form()[0]
 
 setup_view()
 # braid = Braid(2, [1, 1, 1], polyring=False, linear=True, diag=-2)

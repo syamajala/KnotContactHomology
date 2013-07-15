@@ -2,6 +2,81 @@
 from collections import Counter
 from itertools import count
 from sage.all import *
+from IPython.parallel import *
+
+
+def setup_view():
+
+    global c
+    c = Client(profile='sage')
+    global dview
+    dview = c[:]
+    dview.execute("import sys")
+    dview.execute("import os")
+    dview.execute("sys.path.append(os.path.expanduser('~/dev/KnotContactHomology'))")
+    dview.execute("from braids import *")
+
+
+def phi_b_ext_help(args):
+    k, v, i, braid = args
+
+    new_g = 1
+    for g, p in k:
+        new_g = new_g*(braid.phi_ext_sk(i, g)**p)
+
+    return v*new_g
+
+
+def phi_help(args):
+    k, v, t, braid = args
+    r = 0
+    add = False
+
+    e = 1
+    for g, p in k._element_list:
+        gen = braid.alg.gen(g)
+        if gen != t:
+            e = e*(gen**p)
+        elif gen == t:
+            add = True
+    if add:
+        r = r + v*e
+        add = False
+
+    return r
+
+
+def linearize_help(args):
+    k, v, braid = args
+    r = 0
+    e = 0
+    els = k._element_list
+
+    if len(els) > 1:
+        g1 = braid.alg.gen(els[0][0])
+        if els[0][1] != 1:
+            g2 = braid.alg.gen(els[0][0])
+            e = -2*g1 - 2*g2 - 4
+            e = e*(g2**(els[0][1]-2))
+            for g, p in els[1:]:
+                e = e*(braid.alg.gen(g)**p)
+        else:
+            g2 = braid.alg.gen(els[1][0])
+            e = -2*g1 - 2*g2 - 4
+            if els[1][1] != 1:
+                e = e*(g2**(els[1][1]-1))
+            for g, p in els[2:]:
+                e = e*(braid.alg.gen(g)**p)
+    elif els != [] and els[0][1] != 1:
+        e = -4 - 4*braid.alg.gen(els[0][0])
+        e = e*(braid.alg.gen(els[0][0])**(els[0][1]-2))
+    elif els != []:
+        e = braid.alg.gen(els[0][0])
+    else:
+        e = 1
+
+    r = r + v*e
+    return r
 
 
 class Braid:
@@ -240,8 +315,8 @@ class Braid:
         else:
             start = 0
 
-        for i in range(start, self.s+1):
-            for j in range(start, self.s+1):
+        for i in xrange(start, self.s+1):
+            for j in xrange(start, self.s+1):
                 if star:
                     if i == 0:
                         a = a + 'as' + str(j)
@@ -262,15 +337,15 @@ class Braid:
         g = a + b + c + d
 
         if self.polyring:
-            for i in range(1, self.s+1):
-                for j in range(1, self.s+1):
+            for i in xrange(1, self.s+1):
+                for j in xrange(1, self.s+1):
                     e = e + 'e' + str(i) + str(j) + ','
-            for i in range(1, self.s+1):
-                for j in range(1, self.s+1):
+            for i in xrange(1, self.s+1):
+                for j in xrange(1, self.s+1):
                     f = f + 'f' + str(i) + str(j) + ','
             g = g + e + f[:-1]
         else:
-            for i in range(1, self.s+1):
+            for i in xrange(1, self.s+1):
                 e = e + 'e' + str(i) + str(i) + ','
             g = g + e[:-1]
 
@@ -333,17 +408,14 @@ class Braid:
         """
 
         e = self.phi_ext_sk(self.w[0], a)
+        dview.push(dict(braid=self))
+        ref = Reference('braid')
 
         for i in self.w[1:]:
-            new_e = 0
-            for k, v in e._FreeAlgebraElement__monomial_coefficients.iteritems():
-                new_g = 1
-                for g, p in k:
-                    g1 = (self.phi_ext_sk(i, g)**p)
-                    new_g = new_g*g1
-                new_e = new_e + v*new_g
-            e = new_e
-
+            args = [list(j)+[i, ref] for j in e._FreeAlgebraElement__monomial_coefficients.iteritems()]
+            r = dview.map_sync(phi_b_ext_help, args)
+            e = reduce(lambda x, y: x+y, r)
+            
         return e
 
     def linearized(self, l):
@@ -362,116 +434,73 @@ class Braid:
 
         return True
 
-    def linearize(self, l, constants=False):
-        s = l
+    def linearize(self, s, constants=False):
+        dview.push(dict(braid=self))
+        ref = Reference('braid')
 
-        while not self.linearized(s):
-            r = 0
+        while not braid.linearized(s):
 
-            for k, v in s._FreeAlgebraElement__monomial_coefficients.iteritems():
-                e = 0
-                els = k._element_list
+            args = [list(i)+[ref] for i in s._FreeAlgebraElement__monomial_coefficients.iteritems()]
+            r = dview.map_sync(linearize_help, args)
+            s = reduce(lambda x, y: x+y, r)
 
-                if len(els) > 1:
-                    g1 = self.alg.gen(els[0][0])
-                    if els[0][1] != 1:
-                        g2 = self.alg.gen(els[0][0])
-                        e = -2*g1 - 2*g2 - 4
-                        e = e*(g2**(els[0][1]-2))
-                        for g, p in els[1:]:
-                            e = e*(self.alg.gen(g)**p)
-                    else:
-                        g2 = self.alg.gen(els[1][0])
-                        e = -2*g1 - 2*g2 - 4
-                        if els[1][1] != 1:
-                            e = e*(g2**(els[1][1]-1))
-                        for g, p in els[2:]:
-                            e = e*(self.alg.gen(g)**p)
-
-                elif els != [] and els[0][1] != 1:
-                    e = -4 - 4*self.alg.gen(els[0][0])
-                    e = e*(self.alg.gen(els[0][0])**(els[0][1]-2))
-                elif els != []:
-                    e = self.alg.gen(els[0][0])
-                else:
-                    e = 1
-
-                r = r + v*e
-
-            s = r
-
-        if not constants:
-
-            l = 0
-            one = self.alg.monoid().one_element()
-
-            for k, v in s._FreeAlgebraElement__monomial_coefficients.iteritems():
-                    if k != one:
-                        for g, p in k._element_list:
-                            l = l + v*(self.alg.gen(g)**p)
-            return l
-
-        else:
+        if constants:
             return s
+
+        l = 0
+        one = braid.alg.monoid().one_element()
+
+        for k, v in s._FreeAlgebraElement__monomial_coefficients.iteritems():
+                if k != one:
+                    for g, p in k._element_list:
+                        l = l + v*(braid.alg.gen(g)**p)
+
+        return l
 
     def linearizem(self, m, constants=False):
 
-        a = [[self.linearize(m[i, j], constants) for j in range(0, self.s)] for i in range(0, self.s)]
+        a = [[self.linearize(m[i, j], constants) for j in xrange(0, self.s)] 
+             for i in xrange(0, self.s)]
 
-        return matrix(self.alg, self.s, self.s, a)
+        return matrix(self.alg, a)
 
-    # def phi_l_b_ij(self, i, j):
+    def phi_l_b_ij(self, i, j):
 
-    #     a = self.phi_b_ext(self.astar[i, 0])
-    #     t = self.astar[j, 0]
-    #     r = 0
-    #     add = False
+        a = self.phi_b_ext(self.astar[i, 0])
+        t = self.astar[j, 0]
 
-    #     for k, v in a._FreeAlgebraElement__monomial_coefficients.iteritems():
-    #         e = 1
-    #         for g, p in k._element_list:
-    #             gen = self.alg.gen(g)
-    #             if gen != t:
-    #                 e = e*(gen**p)
-    #             elif gen == t:
-    #                 add = True
-    #         if add:
-    #             r = r + v*e
-    #             add = False
+        dview.push(dict(braid=self))
+        r = Reference('braid')
+        args = [list(i)+[t, r] for i in a._FreeAlgebraElement__monomial_coefficients.iteritems()]
 
-    #     return r
+        r = dview.map_sync(phi_help, args)
+        r = reduce(lambda x, y: x+y, r)
 
-    # parallelize this?
+        return r
+
     def phi_l_b(self):
 
         if self.phi_l_bm:
             return self.phi_l_bm
 
-        a = [[self.phi_l_b_ij(i, j) for j in range(1, self.s+1)]
-             for i in range(1, self.s+1)]
-        self.phi_l_bm = matrix(self.alg, a)
-
+        m = [[self.phi_l_b_ij(i, j) for j in xrange(1, self.s+1)]
+             for i in xrange(1, self.s+1)]
+        
+        self.phi_l_bm = matrix(self.alg, m)
         return self.phi_l_bm
 
     def phi_r_b_ij(self, i, j):
 
         a = self.phi_b_ext(self.astar[0, j])
         t = self.astar[0, i]
-        r = 0
-        add = False
+        
+        dview.push(dict(braid=self))
+        r = Reference('braid')
+        args = [list(i)+[t, r] for i in a._FreeAlgebraElement__monomial_coefficients.iteritems()]
 
-        for k, v in a._FreeAlgebraElement__monomial_coefficients.iteritems():
-            e = 1
-            for g, p in k._element_list:
-                gen = self.alg.gen(g)
-                if gen != t:
-                    e = e*(gen**p)
-                elif gen == t:
-                    add = True
-            if add:
-                r = r + v*e
-                add = False
-
+        r = dview.map_sync(phi_help, args)
+        r = reduce(lambda x, y: x+y, r)
+        
         return r
 
     def phi_r_b(self):
@@ -479,10 +508,10 @@ class Braid:
         if self.phi_r_bm:
             return self.phi_r_bm
 
-        a = [[self.phi_r_b_ij(i, j) for j in range(1, self.s+1)] 
-             for i in range(1, self.s+1)]
-        self.phi_r_bm = matrix(self.alg, a)
+        m = [[self.phi_r_b_ij(i, j) for j in xrange(1, self.s+1)] 
+             for i in xrange(1, self.s+1)]
 
+        self.phi_r_bm = matrix(self.alg, m)
         return self.phi_r_bm
 
     def diffa(self):
@@ -585,65 +614,18 @@ class Braid:
         cdict = dict(cdict)
         r = self.s*self.s*2
         c = g.next()
-
-        if not self.polyring:
-            p = matrix(r, c)
-        elif self.polyring:
-            p = matrix(self.br, r, c)
-
-        row = 0
-
-        for e in CartesianProduct(range(0, self.s), range(0, self.s)):
-            i, j = e
-            diff =  db[i, j]
-            for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
-                p[row, cdict[k]] = v
-            row = row + 1
-
-        for e in CartesianProduct(range(0, self.s), range(0, self.s)):
-            i, j = e
-            diff =  dc[i, j]
-            for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
-                p[row, cdict[k]] = v
-            row = row + 1
-
-        return p.smith_form()[0]
-
-    def first_homology(self):
-
-        db = self.diffb()
-        dc = self.diffc()
-        dd = self.diffd()
-        de = self.diffe()
-
-        cdict = []
-        g = iter(count(0))
-        for e in list(self.alg.monoid().gens())[(self.s+1)**2:]:
-
-            s = str(e)
-            i = s[1]
-            j = s[2]
-
-            if s[0] != 'b' and s[0] != 'c':
-                break
-            else:
-                cdict.append((e, g.next()))
-
-        cdict = dict(cdict)
-        r = (self.s**2)+(self.s**2)-2
-        c = g.next()
         p = matrix(r, c)
 
         row = 0
 
-        for e in CartesianProduct(range(0, self.s), range(0, self.s)):
+        for e in CartesianProduct(xrange(0, self.s), xrange(0, self.s)):
             i, j = e
             diff =  db[i, j]
             for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
                 p[row, cdict[k]] = v
             row = row + 1
 
-        for e in CartesianProduct(range(0, self.s), range(0, self.s)):
+        for e in CartesianProduct(xrange(0, self.s), xrange(0, self.s)):
             i, j = e
             diff =  dc[i, j]
             for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
@@ -653,28 +635,21 @@ class Braid:
         return p.smith_form()[0]
 
 
-def satellite(w):
-    r = []
+setup_view()
+# braid = Braid(2, [1, 1, 1], polyring=False, linear=True, diag=-2)
+# p = braid.zero_homology()
+# print p.str()
+# braid.first_homology()
 
-    for i in w:
-        a = [-1*(2*i+1), -1*(2*i+1), 2*i, 2*i+1, 2*i-1, 2*i]
-        r.extend(a)
-
-    return r
-
-# braid = Braid(2, [1, 1, 1], polyring=False, linear=True)
-# braid = Braid(2, [1, 1, 1], polyring=True, linear=True)
-# braid = Braid(3, [1, -2, 1, -2], polyring = False, linear=True)
-# braid = Braid(4, [1, -2, 3, -2, -1, 2, 3], polyring = False, linear=True)
-#p = braid.zero_homology()
-#p = braid.first_homology()
-#print p.str()
-
-w = [2, 1, 3, 2]*3
-w.append(1)
-braid = Braid(4, w, polyring=False, linear=True)
-braid.phi_l_b()
-#p = braid.zero_homology()
+# w = [2, 1, 3, 2]*3
+# w.append(1)
+# braid = Braid(4, w, polyring=False, diag=-2, linear=True)
+# p = braid.zero_homology()
 # print p.str()
 
-# braid = Braid(2, [1, -1], polyring=True, linear=False)
+w1 = [-2, -1]*4
+w2 = [3, 2, 4, 1, 3, 5, 2, 4, 3]*3
+w = w1+w2
+braid = Braid(6, w, polyring=False, diag=-2, linear=True)
+p = braid.zero_homology()
+print p.str()
