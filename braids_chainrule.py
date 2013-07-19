@@ -9,6 +9,7 @@ class Braid:
     def __init__(self, strands, word, polyring=False, linear=True):
         self.s = strands
         self.w = word
+        self.w.reverse()
         self.polyring = polyring
         self.linear = linear
         g = self.gens(star=True)
@@ -280,8 +281,10 @@ class Braid:
         """
         phi_ext_sk returns phi^ext_sigma_z(a_xy) 
         """
-
-        i, j = self.gdicta[a]
+        try:
+            i, j = self.gdicta[a]
+        except KeyError:
+            return a
 
         if k > 0:
 
@@ -335,6 +338,25 @@ class Braid:
         e = self.phi_ext_sk(self.w[0], a)
 
         for i in self.w[1:]:
+            new_e = 0
+            for k, v in e._FreeAlgebraElement__monomial_coefficients.iteritems():
+                new_g = 1
+                for g, p in k:
+                    g1 = (self.phi_ext_sk(i, g)**p)
+                    new_g = new_g*g1
+                new_e = new_e + v*new_g
+            e = new_e
+
+        return e
+
+    def phi_b(self, w, a):
+        """
+        phi_b returns phi_b(a_ij)
+        """
+
+        e = self.phi_ext_sk(w[0], a)
+
+        for i in w[1:]:
             new_e = 0
             for k, v in e._FreeAlgebraElement__monomial_coefficients.iteritems():
                 new_g = 1
@@ -420,69 +442,73 @@ class Braid:
 
         return matrix(self.alg, self.s, self.s, a)
 
-    def phi_l_b_ij(self, i, j):
+    def phi_l_sk(self, k):
+        m = copy(self.i)
+        
+        if k > 0:
+            m[k-1:k+1, k-1:k+1] = [[-1*self.a[k, k-1], -1], [1, 0]]
+        elif k < 0:
+            k = k*-1
+            m[k-1:k+1, k-1:k+1] = [[0, 1], [-1, -1*self.a[k-1, k]]]
 
-        a = self.phi_b_ext(self.astar[i, 0])
-        t = self.astar[j, 0]
-        r = 0
-        add = False
+        return m
 
-        for k, v in a._FreeAlgebraElement__monomial_coefficients.iteritems():
-            e = 1
-            for g, p in k._element_list:
-                gen = self.alg.gen(g)
-                if gen != t:
-                    e = e*(gen**p)
-                elif gen == t:
-                    add = True
-            if add:
-                r = r + v*e
-                add = False
+    def phi_l_b_help(self, w, r):
+        b1 = w[:-1]
+        b2 = w[-1]
 
-        return r
+        if b1 != []:
+            p = self.phi_l_sk(b2)
+            rb1 = list(b1)
+            rb1.reverse()
+
+            if b2 > 0:
+                i = b2
+            elif b2 < 0:
+                i = (b2*-1)+1
+                
+            p[i-1, i-1] = -1*self.phi_b(rb1, -1*p[i-1, i-1])
+            return self.phi_l_b_help(b1, r+[p])
+
+        return r+[self.phi_l_sk(b2)]
 
     def phi_l_b(self):
 
-        if self.phi_l_bm:
-            return self.phi_l_bm
+        return reduce(lambda x, y: x*y, self.phi_l_b_help(self.w, []))
 
-        a = [[self.phi_l_b_ij(i, j) for j in range(1, self.s+1)]
-             for i in range(1, self.s+1)]
-        self.phi_l_bm = matrix(self.alg, a)
+    def phi_r_sk(self, k):
+        m = copy(self.i)
+        
+        if k > 0:
+            m[k-1:k+1, k-1:k+1] = [[-1*self.a[k-1, k], 1], [-1, 0]]
+        elif k < 0:
+            k = k*-1
+            m[k-1:k+1, k-1:k+1] = [[0, -1], [1, -1*self.a[k, k-1]]]
+        return m
 
-        return self.phi_l_bm
+    def phi_r_b_help(self, w, r):
+        b1 = w[:-1]
+        b2 = w[-1]
 
-    def phi_r_b_ij(self, i, j):
+        if b1 != []:
+            p = self.phi_r_sk(b2)
+            rb1 = list(b1)
+            rb1.reverse()
+            if b2 > 0:
+                i = b2
+            elif b2 < 0:
+                i = (b2*-1)+1
 
-        a = self.phi_b_ext(self.astar[0, j])
-        t = self.astar[0, i]
-        r = 0
-        add = False
+            p[i-1, i-1] = -1*self.phi_b(rb1, -1*p[i-1, i-1])
+            return self.phi_r_b_help(b1, r+[p])
 
-        for k, v in a._FreeAlgebraElement__monomial_coefficients.iteritems():
-            e = 1
-            for g, p in k._element_list:
-                gen = self.alg.gen(g)
-                if gen != t:
-                    e = e*(gen**p)
-                elif gen == t:
-                    add = True
-            if add:
-                r = r + v*e
-                add = False
-
-        return r
+        return r+[self.phi_r_sk(b2)]
 
     def phi_r_b(self):
+        r = self.phi_r_b_help(self.w, [])
+        r.reverse()
 
-        if self.phi_r_bm:
-            return self.phi_r_bm
-
-        a = [[self.phi_r_b_ij(i, j) for j in range(1, self.s+1)] 
-             for i in range(1, self.s+1)]
-        self.phi_r_bm = matrix(self.alg, a)
-
-        return self.phi_r_bm
+        return reduce(lambda x, y: x*y, r)
 
     def diffa(self):
 
@@ -594,7 +620,7 @@ class Braid:
 
         for e in CartesianProduct(range(0, self.s), range(0, self.s)):
             i, j = e
-            diff = db[i, j]
+            diff =  db[i, j]
             for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
                 p[row, cdict[k]] = v
             row = row + 1
@@ -619,7 +645,7 @@ class Braid:
         de = self.diffe()
 
         cdict = []
-        g = iter(count(0))
+        g = iter(counpppt(0))
         for e in list(self.alg.monoid().gens())[(self.s+1)**2:]:
 
             s = str(e)
@@ -664,31 +690,23 @@ def satellite(w):
 
     return r
 
-braid = Braid(4, satellite([1]), polyring=False, linear=True)
-print braid.phi_l_b()
+braid = Braid(4, satellite([1]*5), polyring=False, linear=True)
+p = braid.zero_homology()
+print p.str()
+#braid = Braid(4, [-3, -3, 2, 3, 1, 2], polyring=False, linear=True)
+# braid = Braid(2, [1, 1, 1], polyring=False, linear=True)
 # braid = Braid(2, [1, 1, 1], polyring=True, linear=False)
 # braid = Braid(3, [1, -2, 1, -2], polyring = False, linear=True)
-# braid = Braid(5, [1, -2, 3, -2, -1, 2, 3], polyring = False, linear=True)
+# braid = Braid(4, [1, -2, 3, -2, -1, 2, 3], polyring = False, linear=True)
 # p = braid.zero_homology()
 # print p.str()
+
 # w = [2, 1, 3, 2]*3
 # w.append(1)
 # braid = Braid(4, w, polyring=False, linear=True)
 # p = braid.zero_homology()
 # print p.str()
 
-# braid = Braid(2, [1, -1], polyring=True, linear=False)
-# braid = Braid(4, [1, -2, 3, -2, -1, 2, 3], polyring = False, linear=True)
-
-# braid = Braid(4, [1], polyring = False, linear = True)
-
-# braid = Braid(3, [1, 2], polyring = False, linear=True)
-# print braid.phi_l_b()
-# print braid.diffb()
-# p = braid.zero_homology()
-# print p
-
 # braid = Braid(4, satellite([1]), polyring=False, linear=True)
-# pl = braid.phi_l_b()
-# pr = braid.phi_r_b()
-# p = braid.zero_homology()
+# p = braid.phi_l_b()
+

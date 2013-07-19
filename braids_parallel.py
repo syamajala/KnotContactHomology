@@ -14,7 +14,7 @@ def setup_view():
     dview.execute("import sys")
     dview.execute("import os")
     dview.execute("sys.path.append(os.path.expanduser('~/dev/KnotContactHomology'))")
-    dview.execute("from braids import *")
+    dview.execute("from braids_parallel import *")
 
 
 def phi_l_b_ij(args):
@@ -111,7 +111,7 @@ def linearize(args):
     for k, v in s._FreeAlgebraElement__monomial_coefficients.iteritems():
             if k != one:
                 for g, p in k._element_list:
-                    l = l + v*(self.alg.gen(g)**p)
+                    l = l + v*(braid.alg.gen(g)**p)
 
     return (i, j, l)
 
@@ -451,7 +451,9 @@ class Braid:
             for k, v in e._FreeAlgebraElement__monomial_coefficients.iteritems():
                 new_g = 1
                 for g, p in k:
-                    new_g = new_g*(self.phi_ext_sk(i, g)**p)
+                    new_g = new_g*(self.phi_ext_sk(i, g))
+                    if p != 1:
+                        print "pow!!!"
                 new_e = new_e + v*new_g
             e = new_e
 
@@ -494,7 +496,7 @@ class Braid:
         return lm
 
     def phi_l_b(self):
-
+        print "calculating phi_l_b"
         if self.phi_l_bm:
             return self.phi_l_bm
 
@@ -518,7 +520,7 @@ class Braid:
         return self.phi_l_bm
 
     def phi_r_b(self):
-
+        print "calculating phi_r_b"
         if self.phi_r_bm:
             return self.phi_r_bm
 
@@ -546,11 +548,12 @@ class Braid:
         return matrix(self.alg, self.s, self.s)
     
     def diffb(self):
-
+        print "calculating diffb"
         p = self.phi_l_b()
 
         if self.linear and not self.polyring:
             m = (self.i - p)*self.a
+            print "linearizing diffb"
             return self.linearizem(m)
         elif self.linear and self.polyring:
             phi_b = p*self.a*self.phi_r_b()
@@ -563,11 +566,12 @@ class Braid:
             return (self.i - p)*self.a
 
     def diffc(self):
-
+        print "calculating diffc"
         p = self.phi_r_b()
 
         if self.linear and not self.polyring:
             m = self.a*(self.i - p)
+            print "linearizing diffc"
             return self.linearizem(m)
         elif self.linear and self.polyring:
             m = self.ahat - (self.cl*p*self.a)
@@ -578,7 +582,7 @@ class Braid:
             return self.a*(self.i - p)
 
     def diffd(self):
-
+        
         pr = self.phi_r_b()
 
         if self.linear and not self.polyring:
@@ -623,7 +627,7 @@ class Braid:
 
         db = self.diffb()
         dc = self.diffc()
-
+        print "calculating zeroth homology"
         cdict = []
         g = iter(count(0))
         for e in list(self.alg.monoid().gens()):
@@ -662,21 +666,30 @@ class Braid:
         return p.smith_form()[0]
 
 
+def satellite(w):
+    r = []
+
+    for i in w:
+        a = [-1*(2*i+1), -1*(2*i+1), 2*i, 2*i+1, 2*i-1, 2*i]
+        r.extend(a)
+
+    return r
+
+
 setup_view()
-# braid = Braid(2, [1, 1, 1], polyring=False, linear=True, diag=-2)
-# p = braid.zero_homology()
-# print p.str()
-# braid.first_homology()
+braid = Braid(5, [1, 1, -2, 1, 3, -2, -1, -4, 3, 3, -2, 3, -4], polyring=False, linear=True)
+p = braid.zero_homology()
+print p.str()
 
 # w = [2, 1, 3, 2]*3
 # w.append(1)
-# braid = Braid(4, w, polyring=False, diag=-2, linear=True)
+# braid = Braid(4, w, polyring=False, linear=True)
 # p = braid.zero_homology()
 # print p.str()
 
-w1 = [-2, -1]*4
-w2 = [3, 2, 4, 1, 3, 5, 2, 4, 3]*3
-w = w1+w2
-braid = Braid(6, w, polyring=False, diag=-2, linear=True)
-p = braid.zero_homology()
+# w1 = [-2, -1]*4
+# w2 = [3, 2, 4, 1, 3, 5, 2, 4, 3]*3
+# w = w1+w2
+# braid = Braid(6, w, polyring=False, linear=True)
+# p = braid.zero_homology()
 # print p.str()
