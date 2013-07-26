@@ -664,8 +664,8 @@ def satellite(w):
 
     return r
 
-braid = Braid(4, satellite([1]), polyring=False, linear=True)
-print braid.phi_l_b()
+braid = Braid(2, [1], polyring=True, linear=False)
+
 # braid = Braid(2, [1, 1, 1], polyring=True, linear=False)
 # braid = Braid(3, [1, -2, 1, -2], polyring = False, linear=True)
 # braid = Braid(5, [1, -2, 3, -2, -1, 2, 3], polyring = False, linear=True)

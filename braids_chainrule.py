@@ -6,10 +6,13 @@ from sage.all import *
 
 class Braid:
 
-    def __init__(self, strands, word, polyring=False, linear=True):
-        self.s = strands
+    def __init__(self, word, strands=0, polyring=False, linear=True):
         self.w = word
         self.w.reverse()
+        if strands:
+            self.s = strands
+        else:
+            self.s = int(max(map(math.fabs, self.w))+1)
         self.polyring = polyring
         self.linear = linear
         g = self.gens(star=True)
@@ -339,13 +342,16 @@ class Braid:
 
         for i in self.w[1:]:
             new_e = 0
-            for k, v in e._FreeAlgebraElement__monomial_coefficients.iteritems():
-                new_g = 1
-                for g, p in k:
-                    g1 = (self.phi_ext_sk(i, g)**p)
-                    new_g = new_g*g1
-                new_e = new_e + v*new_g
-            e = new_e
+            try:
+                for k, v in e._FreeAlgebraElement__monomial_coefficients.iteritems():
+                    new_g = 1
+                    for g, p in k:
+                        g1 = (self.phi_ext_sk(i, g)**p)
+                        new_g = new_g*g1
+                    new_e = new_e + v*new_g
+                e = new_e
+            except AttributeError:
+                return a
 
         return e
 
@@ -513,7 +519,7 @@ class Braid:
     def diffa(self):
 
         return matrix(self.alg, self.s, self.s)
-    
+
     def diffb(self):
 
         p = self.phi_l_b()
@@ -645,7 +651,7 @@ class Braid:
         de = self.diffe()
 
         cdict = []
-        g = iter(counpppt(0))
+        g = iter(count(0))
         for e in list(self.alg.monoid().gens())[(self.s+1)**2:]:
 
             s = str(e)
@@ -666,20 +672,28 @@ class Braid:
 
         for e in CartesianProduct(range(0, self.s), range(0, self.s)):
             i, j = e
-            diff =  db[i, j]
+            diff = dd[i, j]
+
             for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
-                p[row, cdict[k]] = v
+                try:
+                    p[row, cdict[k]] = v
+                except KeyError:
+                    continue
             row = row + 1
 
-        for e in CartesianProduct(range(0, self.s), range(0, self.s)):
-            i, j = e
-            diff =  dc[i, j]
+        for i in range(0, self.s):
+            diff = de[i, i]
             for k, v in diff._FreeAlgebraElement__monomial_coefficients.iteritems():
-                p[row, cdict[k]] = v
+                try:
+                    p[row, cdict[k]] = v
+                except KeyError:
+                    continue
             row = row + 1
 
-        return p
-
+        if self.polyring:
+            return p
+        else:
+            return p.smith_form()[0]
 
 def satellite(w):
     r = []
@@ -690,9 +704,8 @@ def satellite(w):
 
     return r
 
-braid = Braid(4, satellite([1]*5), polyring=False, linear=True)
-p = braid.zero_homology()
-print p.str()
+braid = Braid([1, 1, 1])
+m = braid.first_homology()
 #braid = Braid(4, [-3, -3, 2, 3, 1, 2], polyring=False, linear=True)
 # braid = Braid(2, [1, 1, 1], polyring=False, linear=True)
 # braid = Braid(2, [1, 1, 1], polyring=True, linear=False)
@@ -709,4 +722,5 @@ print p.str()
 
 # braid = Braid(4, satellite([1]), polyring=False, linear=True)
 # p = braid.phi_l_b()
-
+# print Braid([1, 1, 1]).zero_homology().str()
+# print Braid(satellite([1, 1, 1])).zero_homology().str()
