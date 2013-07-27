@@ -1,5 +1,4 @@
-Compute the cord algebra for T2,2n+1 torus knots and braids. Based on the following
-three papers by Lenny Ng: 
+Computes the zeroth, first, and second knot contact homology given a braid word.
 
 http://arxiv.org/abs/math/0302099
 http://arxiv.org/pdf/math/0303343
