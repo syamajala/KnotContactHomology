@@ -488,7 +488,7 @@ class Braid:
 
     def phi_r_sk(self, k):
         m = copy(self.i)
-        
+
         if k > 0:
             m[k-1:k+1, k-1:k+1] = [[-1*self.a[k-1, k], 1], [-1, 0]]
         elif k < 0:
@@ -758,3 +758,4 @@ def satellite(w):
         r.extend(a)
 
     return r
+
